@@ -6,39 +6,25 @@
 <title>Dark Quiz Engine</title>
 
 <style>
-    * {
-        box-sizing: border-box;
-    }
-
     body {
         margin: 0;
         font-family: Arial, sans-serif;
         background: radial-gradient(circle at top, #1a1a1f, #0a0a0c);
         color: #eaeaea;
+        display: flex;
         height: 100vh;
         overflow: hidden;
-
-        /* IMPORTANT FIX */
-        display: flex;
-        flex-direction: row;
     }
 
-    /* SIDEBAR FIXED */
+    /* SIDEBAR */
     .sidebar {
         width: 280px;
-        min-width: 280px;
-        max-width: 280px;
-
-        height: 100vh;
         background: rgba(20,20,25,0.85);
         backdrop-filter: blur(10px);
         border-right: 1px solid #2a2a2a;
-
         padding: 15px;
         display: flex;
         flex-direction: column;
-
-        overflow-y: auto;
     }
 
     .title {
@@ -53,6 +39,7 @@
         background: #1c1c22;
         border-radius: 8px;
         cursor: pointer;
+        transition: 0.2s;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -67,6 +54,10 @@
         color: #aaa;
     }
 
+    button {
+        cursor: pointer;
+    }
+
     .danger-btn {
         margin-top: 10px;
         padding: 10px;
@@ -77,13 +68,12 @@
         cursor: pointer;
     }
 
-    /* MAIN AREA FIX */
+    /* MAIN */
     .main {
         flex: 1;
-        min-width: 0; /* CRITICAL FIX for flex overflow */
         display: flex;
         flex-direction: column;
-        height: 100vh;
+        position: relative;
     }
 
     .topbar {
@@ -95,20 +85,20 @@
 
     .content {
         flex: 1;
+        padding: 25px;
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 20px;
-        overflow-y: auto;
     }
 
     .card {
-        width: min(700px, 90%);
+        width: 60%;
         background: rgba(30,30,40,0.7);
         padding: 25px;
         border-radius: 16px;
         border: 1px solid #333;
         box-shadow: 0 0 20px rgba(0,0,0,0.4);
+        transition: 0.2s;
     }
 
     .question {
@@ -122,6 +112,7 @@
         margin: 8px 0;
         border-radius: 10px;
         cursor: pointer;
+        transition: 0.2s;
     }
 
     .option:hover {
@@ -137,17 +128,6 @@
         color: white;
     }
 
-    button {
-        margin-top: 10px;
-        padding: 10px;
-        border-radius: 10px;
-        border: none;
-        background: #4c7dff;
-        color: white;
-        cursor: pointer;
-    }
-
-    /* HUD */
     .hud {
         position: fixed;
         top: 10px;
@@ -157,9 +137,10 @@
         padding: 10px 14px;
         border-radius: 12px;
         font-size: 13px;
+        color: #ddd;
+        backdrop-filter: blur(10px);
     }
 
-    /* FLASH */
     @keyframes flashRed {
         0% { background: rgba(255,0,0,0.0); }
         30% { background: rgba(255,0,0,0.25); }
@@ -178,7 +159,6 @@
     Score: 0 | Mistakes: 0 | Progress: 0%
 </div>
 
-<!-- SIDEBAR -->
 <div class="sidebar">
     <div class="title">📁 Quiz Library</div>
 
@@ -191,7 +171,6 @@
     </button>
 </div>
 
-<!-- MAIN -->
 <div class="main">
     <div class="topbar">Dark Quiz Engine</div>
 
@@ -230,7 +209,7 @@ function updateHUD() {
     `;
 }
 
-/* RENDER */
+/* RENDER LIST */
 function renderList() {
     const list = document.getElementById("quizList");
     list.innerHTML = "";
@@ -241,13 +220,14 @@ function renderList() {
 
         const title = document.createElement("span");
         title.textContent = q.title;
+        title.style.cursor = "pointer";
         title.onclick = () => startQuiz(i);
 
         const del = document.createElement("button");
         del.textContent = "✖";
         del.style.background = "transparent";
-        del.style.color = "#ff5c5c";
         del.style.border = "none";
+        del.style.color = "#ff5c5c";
         del.onclick = (e) => {
             e.stopPropagation();
             deleteQuiz(i);
@@ -260,7 +240,7 @@ function renderList() {
     });
 }
 
-/* UPLOAD SAFE */
+/* UPLOAD */
 document.getElementById("upload").addEventListener("change", function(e){
     const file = e.target.files[0];
     const reader = new FileReader();
@@ -277,7 +257,8 @@ document.getElementById("upload").addEventListener("change", function(e){
             quizzes.push(quiz);
             localStorage.setItem("quizzes", JSON.stringify(quizzes));
             renderList();
-        } catch {
+
+        } catch (err) {
             alert("Invalid JSON file");
         }
     };
@@ -305,7 +286,9 @@ function flashRed() {
     const card = document.getElementById("quizCard");
     card.classList.add("flash");
 
-    setTimeout(() => card.classList.remove("flash"), 400);
+    setTimeout(() => {
+        card.classList.remove("flash");
+    }, 400);
 }
 
 /* QUESTION */
@@ -315,28 +298,37 @@ function showQuestion() {
 
     if (!q) {
         card.innerHTML = `
-            <h2>Finished 🎉</h2>
+            <h2>Quiz Finished 🎉</h2>
             <p>Score: ${score}</p>
             <p>Mistakes: ${mistakes}</p>
+            <p>Final: ${score} / ${currentQuiz.questions.length}</p>
         `;
         updateHUD();
         return;
     }
 
-    let html = `<div class="question">Q${index+1}: ${q.question}</div>`;
+    let html = `
+        <div class="question">
+            Q${index+1}: ${q.question}
+        </div>
+    `;
 
     if (q.type === "mcq") {
-        q.choices.forEach(c => {
-            html += `<div class="option" onclick="answerMCQ('${c}')">${c}</div>`;
+        q.choices.forEach(choice => {
+            html += `<div class="option" onclick="answerMCQ('${choice}')">${choice}</div>`;
         });
-    } else if (q.type === "tf") {
+    }
+
+    else if (q.type === "tf") {
         html += `
             <div class="option" onclick="answerTF(true)">True</div>
             <div class="option" onclick="answerTF(false)">False</div>
         `;
-    } else {
+    }
+
+    else if (q.type === "id") {
         html += `
-            <input class="answer-box" id="idAnswer"/>
+            <input class="answer-box" id="idAnswer" placeholder="Type answer..." />
             <button onclick="answerID()">Submit</button>
         `;
     }
@@ -349,47 +341,71 @@ function showQuestion() {
 function answerMCQ(ans) {
     const correct = normalize(currentQuiz.questions[index].answer);
 
-    if (normalize(ans) === correct) score++;
-    else { mistakes++; flashRed(); }
+    if (normalize(ans) === correct) {
+        score++;
+    } else {
+        mistakes++;
+        flashRed();
+    }
 
     index++;
     showQuestion();
+    updateHUD();
 }
 
 function answerTF(ans) {
-    if (ans === currentQuiz.questions[index].answer) score++;
-    else { mistakes++; flashRed(); }
+    const correct = currentQuiz.questions[index].answer;
+
+    if (ans === correct) {
+        score++;
+    } else {
+        mistakes++;
+        flashRed();
+    }
 
     index++;
     showQuestion();
+    updateHUD();
 }
 
 function answerID() {
     const user = normalize(document.getElementById("idAnswer").value);
     const correct = normalize(currentQuiz.questions[index].answer);
 
-    if (user === correct) score++;
-    else { mistakes++; flashRed(); }
+    if (user === correct) {
+        score++;
+    } else {
+        mistakes++;
+        flashRed();
+    }
 
     index++;
     showQuestion();
+    updateHUD();
 }
 
-/* DELETE */
+/* DELETE SINGLE QUIZ */
 function deleteQuiz(i) {
     quizzes.splice(i, 1);
     localStorage.setItem("quizzes", JSON.stringify(quizzes));
     renderList();
+
+    if (quizzes.length === 0) {
+        currentQuiz = null;
+        document.getElementById("quizCard").innerHTML =
+            "<h2>No quizzes available</h2>";
+    }
 }
 
 /* CLEAR ALL */
 function clearAllQuizzes() {
-    if (!confirm("Delete all quizzes?")) return;
+    if (!confirm("Delete ALL quizzes?")) return;
 
     quizzes = [];
     localStorage.removeItem("quizzes");
     renderList();
 
+    currentQuiz = null;
     document.getElementById("quizCard").innerHTML =
         "<h2>All quizzes cleared</h2>";
 }
