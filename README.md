@@ -127,6 +127,30 @@
         margin-bottom: 15px;
         color: #aaa;
     }
+    /* HUD SCOREBAR */
+.hud {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(20,20,25,0.85);
+    border: 1px solid #333;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    color: #ddd;
+    backdrop-filter: blur(10px);
+}
+
+/* FLASH RED ANIMATION */
+@keyframes flashRed {
+    0% { background: rgba(255,0,0,0.0); }
+    30% { background: rgba(255,0,0,0.25); }
+    100% { background: rgba(255,0,0,0.0); }
+}
+
+.flash {
+    animation: flashRed 0.4s ease;
+}
 </style>
 </head>
 
@@ -152,9 +176,11 @@
 let quizzes = [];
 let currentQuiz = null;
 let index = 0;
-let score = 0;
 
-/* LOAD FROM LOCALSTORAGE */
+let score = 0;
+let mistakes = 0;
+
+/* LOAD SAVED */
 function loadSaved() {
     const saved = localStorage.getItem("quizzes");
     if (saved) quizzes = JSON.parse(saved);
@@ -162,7 +188,19 @@ function loadSaved() {
 }
 loadSaved();
 
-/* RENDER LIST */
+/* HUD UPDATE */
+function updateHUD() {
+    const hud = document.getElementById("hud");
+
+    const total = currentQuiz ? currentQuiz.questions.length : 0;
+    const progress = total ? Math.round((index / total) * 100) : 0;
+
+    hud.innerHTML = `
+        Score: ${score} | Mistakes: ${mistakes} | Progress: ${progress}%
+    `;
+}
+
+/* RENDER QUIZ LIST */
 function renderList() {
     const list = document.getElementById("quizList");
     list.innerHTML = "";
@@ -176,7 +214,7 @@ function renderList() {
     });
 }
 
-/* UPLOAD JSON */
+/* UPLOAD */
 document.getElementById("upload").addEventListener("change", function(e){
     const file = e.target.files[0];
     const reader = new FileReader();
@@ -196,15 +234,27 @@ function startQuiz(i) {
     currentQuiz = quizzes[i];
     index = 0;
     score = 0;
+    mistakes = 0;
     showQuestion();
+    updateHUD();
 }
 
-/* NORMALIZE ANSWER */
+/* NORMALIZE */
 function normalize(str) {
     return String(str).toLowerCase().trim();
 }
 
-/* RENDER QUESTION */
+/* WRONG FLASH */
+function flashRed() {
+    const card = document.getElementById("quizCard");
+    card.classList.add("flash");
+
+    setTimeout(() => {
+        card.classList.remove("flash");
+    }, 400);
+}
+
+/* QUESTION */
 function showQuestion() {
     const card = document.getElementById("quizCard");
     const q = currentQuiz.questions[index];
@@ -212,13 +262,18 @@ function showQuestion() {
     if (!q) {
         card.innerHTML = `
             <h2>Quiz Finished 🎉</h2>
-            <p>Your Score: ${score} / ${currentQuiz.questions.length}</p>
+            <p><b>Score:</b> ${score}</p>
+            <p><b>Mistakes:</b> ${mistakes}</p>
+            <p><b>Final Score:</b> ${score} / ${currentQuiz.questions.length}</p>
         `;
+        updateHUD();
         return;
     }
 
-    let html = `<div class="progress">Question ${index+1} / ${currentQuiz.questions.length}</div>`;
-    html += `<div class="question">${q.question}</div>`;
+    let html = `
+        <div class="progress">Question ${index+1} / ${currentQuiz.questions.length}</div>
+        <div class="question">${q.question}</div>
+    `;
 
     if (q.type === "mcq") {
         q.choices.forEach(choice => {
@@ -241,30 +296,58 @@ function showQuestion() {
     }
 
     card.innerHTML = html;
+    updateHUD();
 }
 
 /* ANSWERS */
 function answerMCQ(ans) {
-    if (normalize(ans) === normalize(currentQuiz.questions[index].answer)) score++;
+    const correct = normalize(currentQuiz.questions[index].answer);
+
+    if (normalize(ans) === correct) {
+        score++;
+    } else {
+        mistakes++;
+        flashRed();
+    }
+
     index++;
     showQuestion();
+    updateHUD();
 }
 
 function answerTF(ans) {
-    if (ans === currentQuiz.questions[index].answer) score++;
+    const correct = currentQuiz.questions[index].answer;
+
+    if (ans === correct) {
+        score++;
+    } else {
+        mistakes++;
+        flashRed();
+    }
+
     index++;
     showQuestion();
+    updateHUD();
 }
 
 function answerID() {
     const user = normalize(document.getElementById("idAnswer").value);
     const correct = normalize(currentQuiz.questions[index].answer);
 
-    if (user === correct) score++;
+    if (user === correct) {
+        score++;
+    } else {
+        mistakes++;
+        flashRed();
+    }
+
     index++;
     showQuestion();
+    updateHUD();
 }
 </script>
-
+<div class="hud" id="hud">
+    Score: 0 | Mistakes: 0 | Progress: 0%
+</div>
 </body>
 </html>
