@@ -13,12 +13,13 @@
         color: #eaeaea;
         display: flex;
         height: 100vh;
+        overflow: hidden;
     }
 
     /* SIDEBAR */
     .sidebar {
         width: 280px;
-        background: rgba(20,20,25,0.8);
+        background: rgba(20,20,25,0.85);
         backdrop-filter: blur(10px);
         border-right: 1px solid #2a2a2a;
         padding: 15px;
@@ -39,6 +40,9 @@
         border-radius: 8px;
         cursor: pointer;
         transition: 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
     .quiz-item:hover {
@@ -50,11 +54,26 @@
         color: #aaa;
     }
 
+    button {
+        cursor: pointer;
+    }
+
+    .danger-btn {
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 10px;
+        border: none;
+        background: #ff3b3b;
+        color: white;
+        cursor: pointer;
+    }
+
     /* MAIN */
     .main {
         flex: 1;
         display: flex;
         flex-direction: column;
+        position: relative;
     }
 
     .topbar {
@@ -68,7 +87,6 @@
         flex: 1;
         padding: 25px;
         display: flex;
-        flex-direction: column;
         justify-content: center;
         align-items: center;
     }
@@ -80,6 +98,7 @@
         border-radius: 16px;
         border: 1px solid #333;
         box-shadow: 0 0 20px rgba(0,0,0,0.4);
+        transition: 0.2s;
     }
 
     .question {
@@ -109,57 +128,47 @@
         color: white;
     }
 
-    button {
-        margin-top: 15px;
-        padding: 10px 15px;
-        border: none;
-        border-radius: 10px;
-        background: #4c7dff;
-        color: white;
-        cursor: pointer;
+    .hud {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(20,20,25,0.85);
+        border: 1px solid #333;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-size: 13px;
+        color: #ddd;
+        backdrop-filter: blur(10px);
     }
 
-    button:hover {
-        background: #3a66dd;
+    @keyframes flashRed {
+        0% { background: rgba(255,0,0,0.0); }
+        30% { background: rgba(255,0,0,0.25); }
+        100% { background: rgba(255,0,0,0.0); }
     }
 
-    .progress {
-        margin-bottom: 15px;
-        color: #aaa;
+    .flash {
+        animation: flashRed 0.4s ease;
     }
-    /* HUD SCOREBAR */
-.hud {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    background: rgba(20,20,25,0.85);
-    border: 1px solid #333;
-    padding: 10px 14px;
-    border-radius: 12px;
-    font-size: 13px;
-    color: #ddd;
-    backdrop-filter: blur(10px);
-}
-
-/* FLASH RED ANIMATION */
-@keyframes flashRed {
-    0% { background: rgba(255,0,0,0.0); }
-    30% { background: rgba(255,0,0,0.25); }
-    100% { background: rgba(255,0,0,0.0); }
-}
-
-.flash {
-    animation: flashRed 0.4s ease;
-}
 </style>
 </head>
 
 <body>
 
+<div class="hud" id="hud">
+    Score: 0 | Mistakes: 0 | Progress: 0%
+</div>
+
 <div class="sidebar">
     <div class="title">📁 Quiz Library</div>
+
     <div id="quizList"></div>
+
     <input type="file" id="upload" accept=".json"/>
+
+    <button class="danger-btn" onclick="clearAllQuizzes()">
+        🗑 Clear All Quizzes
+    </button>
 </div>
 
 <div class="main">
@@ -180,7 +189,7 @@ let index = 0;
 let score = 0;
 let mistakes = 0;
 
-/* LOAD SAVED */
+/* LOAD */
 function loadSaved() {
     const saved = localStorage.getItem("quizzes");
     if (saved) quizzes = JSON.parse(saved);
@@ -188,7 +197,7 @@ function loadSaved() {
 }
 loadSaved();
 
-/* HUD UPDATE */
+/* HUD */
 function updateHUD() {
     const hud = document.getElementById("hud");
 
@@ -200,7 +209,7 @@ function updateHUD() {
     `;
 }
 
-/* RENDER QUIZ LIST */
+/* RENDER LIST */
 function renderList() {
     const list = document.getElementById("quizList");
     list.innerHTML = "";
@@ -208,8 +217,25 @@ function renderList() {
     quizzes.forEach((q, i) => {
         const div = document.createElement("div");
         div.className = "quiz-item";
-        div.textContent = q.title;
-        div.onclick = () => startQuiz(i);
+
+        const title = document.createElement("span");
+        title.textContent = q.title;
+        title.style.cursor = "pointer";
+        title.onclick = () => startQuiz(i);
+
+        const del = document.createElement("button");
+        del.textContent = "✖";
+        del.style.background = "transparent";
+        del.style.border = "none";
+        del.style.color = "#ff5c5c";
+        del.onclick = (e) => {
+            e.stopPropagation();
+            deleteQuiz(i);
+        };
+
+        div.appendChild(title);
+        div.appendChild(del);
+
         list.appendChild(div);
     });
 }
@@ -220,16 +246,27 @@ document.getElementById("upload").addEventListener("change", function(e){
     const reader = new FileReader();
 
     reader.onload = function(event){
-        const quiz = JSON.parse(event.target.result);
-        quizzes.push(quiz);
-        localStorage.setItem("quizzes", JSON.stringify(quizzes));
-        renderList();
+        try {
+            const quiz = JSON.parse(event.target.result);
+
+            if (!quiz.title || !quiz.questions) {
+                alert("Invalid quiz format");
+                return;
+            }
+
+            quizzes.push(quiz);
+            localStorage.setItem("quizzes", JSON.stringify(quizzes));
+            renderList();
+
+        } catch (err) {
+            alert("Invalid JSON file");
+        }
     };
 
     reader.readAsText(file);
 });
 
-/* START QUIZ */
+/* START */
 function startQuiz(i) {
     currentQuiz = quizzes[i];
     index = 0;
@@ -244,7 +281,7 @@ function normalize(str) {
     return String(str).toLowerCase().trim();
 }
 
-/* WRONG FLASH */
+/* FLASH */
 function flashRed() {
     const card = document.getElementById("quizCard");
     card.classList.add("flash");
@@ -262,17 +299,18 @@ function showQuestion() {
     if (!q) {
         card.innerHTML = `
             <h2>Quiz Finished 🎉</h2>
-            <p><b>Score:</b> ${score}</p>
-            <p><b>Mistakes:</b> ${mistakes}</p>
-            <p><b>Final Score:</b> ${score} / ${currentQuiz.questions.length}</p>
+            <p>Score: ${score}</p>
+            <p>Mistakes: ${mistakes}</p>
+            <p>Final: ${score} / ${currentQuiz.questions.length}</p>
         `;
         updateHUD();
         return;
     }
 
     let html = `
-        <div class="progress">Question ${index+1} / ${currentQuiz.questions.length}</div>
-        <div class="question">${q.question}</div>
+        <div class="question">
+            Q${index+1}: ${q.question}
+        </div>
     `;
 
     if (q.type === "mcq") {
@@ -290,7 +328,7 @@ function showQuestion() {
 
     else if (q.type === "id") {
         html += `
-            <input class="answer-box" id="idAnswer" placeholder="Type your answer..." />
+            <input class="answer-box" id="idAnswer" placeholder="Type answer..." />
             <button onclick="answerID()">Submit</button>
         `;
     }
@@ -345,9 +383,33 @@ function answerID() {
     showQuestion();
     updateHUD();
 }
+
+/* DELETE SINGLE QUIZ */
+function deleteQuiz(i) {
+    quizzes.splice(i, 1);
+    localStorage.setItem("quizzes", JSON.stringify(quizzes));
+    renderList();
+
+    if (quizzes.length === 0) {
+        currentQuiz = null;
+        document.getElementById("quizCard").innerHTML =
+            "<h2>No quizzes available</h2>";
+    }
+}
+
+/* CLEAR ALL */
+function clearAllQuizzes() {
+    if (!confirm("Delete ALL quizzes?")) return;
+
+    quizzes = [];
+    localStorage.removeItem("quizzes");
+    renderList();
+
+    currentQuiz = null;
+    document.getElementById("quizCard").innerHTML =
+        "<h2>All quizzes cleared</h2>";
+}
 </script>
-<div class="hud" id="hud">
-    Score: 0 | Mistakes: 0 | Progress: 0%
-</div>
+
 </body>
 </html>
